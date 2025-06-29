@@ -4,9 +4,9 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 
 # --- CONFIG ---
-INFURA_URL = "https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID"
-USDC_ADDRESS = "0xYourUSDCContractAddress"  # USDC token contract on Sepolia
-VAULT_ADDRESS = "0xYourVaultContractAddress"  # Your deployed SimplusVault
+INFURA_URL = "https://sepolia.infura.io/v3/e0fcce634506410b87fc31064eed915a"
+USDC_ADDRESS = "0x2Bc7c4Afc076088DB03366a6CA9729ba9E450DaA"  # USDC token contract on Sepolia
+VAULT_ADDRESS = "0x7263b8726C96566927626773CbD6B19d32ff76E3"  # Your deployed SimplusVault
 
 # --- ABIs ---
 ERC20_ABI = [
