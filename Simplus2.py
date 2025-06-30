@@ -6,154 +6,145 @@ import json
 import os
 from eth_account import Account
 
-# ---------------- Configuration ----------------
-INFURA_URL = "https://sepolia.infura.io/v3/e0fcce634506410b87fc31064eed915a"  # Replace with your Infura Project ID
-SIMPLUS_CONTRACT_ADDRESS = "0x7263b8726C96566927626773CbD6B19d32ff76E3"      # Replace with your deployed SimplusVault contract address
-USDC_CONTRACT_ADDRESS = "0x2Bc7c4Afc076088DB03366a6CA9729ba9E450DaA"                 # USDC on Sepolia (or mock USDC)
+# -------- Configuration --------
+INFURA_URL = "https://sepolia.infura.io/v3/YOUR_INFURA_KEY"
+SIMPLUS_CONTRACT_ADDRESS = "0x7263b8726C96566927626773CbD6B19d32ff76E3"
+USDC_CONTRACT_ADDRESS = "0x2Bc7c4Afc076088DB03366a6CA9729ba9E450DaA"
 WALLET_DB_FILE = "wallet_db.json"
 
-SIMPLUS_ABI = json.load(open("simplus_abi.json"))  # Save ABI as simplus_abi.json
-USDC_ABI = json.load(open("usdc_abi.json"))        # Save standard ERC20 ABI as usdc_abi.json
+# -------- Load ABIs --------
+with open("simplus_abi.json") as f:
+    SIMPLUS_ABI = json.load(f)
+with open("usdc_abi.json") as f:
+    USDC_ABI = json.load(f)
 
-# ---------------- Load Wallet Database ----------------
-def load_wallet_db():
-    if os.path.exists(WALLET_DB_FILE):
-        with open(WALLET_DB_FILE, 'r') as f:
-            return json.load(f)
-    return {}
-
-def save_wallet_db(db):
-    with open(WALLET_DB_FILE, 'w') as f:
-        json.dump(db, f)
-
+# -------- Init Web3 --------
 w3 = Web3(Web3.HTTPProvider(INFURA_URL))
 if not w3.is_connected():
     st.error("Failed to connect to Web3 provider.")
     st.stop()
 
+# -------- DB --------
+def load_wallet_db():
+    if os.path.exists(WALLET_DB_FILE):
+        with open(WALLET_DB_FILE) as f:
+            return json.load(f)
+    return {}
+
+def save_wallet_db(db):
+    with open(WALLET_DB_FILE, "w") as f:
+        json.dump(db, f)
+
 wallet_db = load_wallet_db()
-st.set_page_config(page_title="Simplus Wallet", page_icon="🌐")
-st.title("Simplus Wallet - USDC Focused")
-mode = st.radio("Select Mode", ["Admin", "User"])
 
-# ---------------- Admin Mode ----------------
+# -------- UI --------
+st.set_page_config("Simplus Wallet", "💸")
+st.title("💸 Simplus Wallet (USDC)")
+mode = st.radio("Choose Mode", ["Admin", "User"])
+
+# -------- Admin --------
 if mode == "Admin":
-    st.header("Admin Panel")
+    st.header("Admin Tools")
 
-    with st.expander("Create a New Simplus Wallet"):
+    with st.expander("Generate New Wallet"):
         if st.button("Create Wallet"):
             acct = Account.create()
-            address = acct.address
-            private_key = acct.key.hex()
-            password = secrets.token_urlsafe(8)
-            wallet_db[address] = {"private_key": private_key, "password": password}
+            addr = acct.address
+            pk = acct.key.hex()
+            pwd = secrets.token_urlsafe(8)
+            wallet_db[addr] = {"private_key": pk, "password": pwd}
             save_wallet_db(wallet_db)
-            st.success("Wallet Created")
-            st.write(f"**Wallet Address:** `{address}`")
-            st.write(f"**Access Code:** `{password}`")
+            st.success("Wallet created.")
+            st.code(f"Address: {addr}")
+            st.code(f"Password: {pwd}")
 
-    with st.expander("Check User USDC Balance"):
-        check_addr = st.text_input("Wallet Address to Check")
+    with st.expander("Check USDC Balance"):
+        query = st.text_input("Wallet to Check")
         if st.button("Check Balance"):
             try:
-                usdc_contract = w3.eth.contract(address=USDC_CONTRACT_ADDRESS, abi=USDC_ABI)
-                balance = usdc_contract.functions.balanceOf(check_addr).call() / 1e6
-                st.write(f"USDC Balance: {balance:.6f} USDC")
+                usdc = w3.eth.contract(address=USDC_CONTRACT_ADDRESS, abi=USDC_ABI)
+                balance = usdc.functions.balanceOf(query).call() / 1e6
+                st.write(f"USDC Balance: {balance:.6f}")
             except Exception as e:
-                st.error(f"Error checking balance: {e}")
+                st.error(str(e))
 
-# ---------------- User Mode ----------------
+# -------- User --------
 elif mode == "User":
-    st.header("User Wallet Access")
-    address = st.text_input("Wallet Address")
-    code = st.text_input("Access Code", type="password")
+    st.header("Wallet Login")
+
+    addr = st.text_input("Wallet Address")
+    pwd = st.text_input("Access Code", type="password")
 
     if st.button("Login"):
-        if wallet_db.get(address) and wallet_db[address]["password"] == code:
-            st.success("Login Successful")
-            user_key = wallet_db[address]["private_key"]
-            st.session_state["user_address"] = address
-            st.session_state["user_key"] = user_key
+        if wallet_db.get(addr) and wallet_db[addr]["password"] == pwd:
+            st.session_state["user"] = addr
+            st.session_state["key"] = wallet_db[addr]["private_key"]
+            st.success("Welcome!")
         else:
-            st.error("Invalid Address or Access Code")
+            st.error("Invalid credentials.")
 
-    if st.session_state.get("user_address"):
-        user_address = st.session_state["user_address"]
-        user_key = st.session_state["user_key"]
-        usdc_contract = w3.eth.contract(address=USDC_CONTRACT_ADDRESS, abi=USDC_ABI)
-        vault_contract = w3.eth.contract(address=SIMPLUS_CONTRACT_ADDRESS, abi=SIMPLUS_ABI)
+    if st.session_state.get("user"):
+        addr = st.session_state["user"]
+        key = st.session_state["key"]
+        usdc = w3.eth.contract(address=USDC_CONTRACT_ADDRESS, abi=USDC_ABI)
+        vault = w3.eth.contract(address=SIMPLUS_CONTRACT_ADDRESS, abi=SIMPLUS_ABI)
 
-        st.subheader(f"Welcome `{user_address}`")
+        st.markdown(f"**Your Wallet:** `{addr}`")
 
-        # Show on-chain USDC balance
         try:
-            onchain_bal = usdc_contract.functions.balanceOf(user_address).call() / 1e6
-            st.write(f"USDC in Wallet: {onchain_bal:.6f} USDC")
-        except:
-            st.error("Error fetching USDC balance")
+            bal = usdc.functions.balanceOf(addr).call() / 1e6
+            st.write(f"USDC Balance: {bal:.6f}")
+        except Exception as e:
+            st.error("Balance error: " + str(e))
 
-        # Deposit to vault
-        deposit_amt = st.number_input("USDC to Deposit to Vault", min_value=0.000001, step=0.01)
-        if st.button("Deposit to Vault"):
+        # Deposit
+        amt = st.number_input("Amount to Deposit (USDC)", min_value=0.000001, step=0.01)
+        if st.button("Deposit"):
             try:
-                nonce = w3.eth.get_transaction_count(user_address)
-                approve_tx = usdc_contract.functions.approve(SIMPLUS_CONTRACT_ADDRESS, int(deposit_amt * 1e6)).build_transaction({
-                    "from": user_address,
-                    "nonce": nonce,
-                    "gas": 80000,
-                    "gasPrice": w3.eth.gas_price
+                nonce = w3.eth.get_transaction_count(addr)
+                tx1 = usdc.functions.approve(SIMPLUS_CONTRACT_ADDRESS, int(amt * 1e6)).build_transaction({
+                    "from": addr, "nonce": nonce, "gas": 80000, "gasPrice": w3.eth.gas_price
                 })
-                signed_approve = w3.eth.account.sign_transaction(approve_tx, private_key=user_key)
-                w3.eth.send_raw_transaction(signed_approve.rawTransaction)
-
-                nonce += 1
-                deposit_tx = vault_contract.functions.deposit(int(deposit_amt * 1e6)).build_transaction({
-                    "from": user_address,
-                    "nonce": nonce,
-                    "gas": 120000,
-                    "gasPrice": w3.eth.gas_price
+                tx2 = vault.functions.deposit(int(amt * 1e6)).build_transaction({
+                    "from": addr, "nonce": nonce + 1, "gas": 100000, "gasPrice": w3.eth.gas_price
                 })
-                signed_deposit = w3.eth.account.sign_transaction(deposit_tx, private_key=user_key)
-                tx_hash = w3.eth.send_raw_transaction(signed_deposit.rawTransaction)
-                st.success(f"Deposit Sent: {w3.to_hex(tx_hash)}")
+                signed1 = w3.eth.account.sign_transaction(tx1, key)
+                signed2 = w3.eth.account.sign_transaction(tx2, key)
+                w3.eth.send_raw_transaction(signed1.rawTransaction)
+                tx_hash = w3.eth.send_raw_transaction(signed2.rawTransaction)
+                st.success(f"Deposited! TX: {w3.to_hex(tx_hash)}")
             except Exception as e:
-                st.error(f"Deposit failed: {e}")
+                st.error(f"Deposit error: {e}")
 
-        # Withdraw to own wallet
-        withdraw_amt = st.number_input("USDC to Withdraw to My Wallet", min_value=0.000001, step=0.01)
-        if st.button("Withdraw to Self"):
+        # Withdraw to self
+        wd_amt = st.number_input("Withdraw to My Wallet", min_value=0.000001, step=0.01, key="wd")
+        if st.button("Withdraw to Wallet"):
             try:
-                nonce = w3.eth.get_transaction_count(user_address)
-                tx = vault_contract.functions.withdraw(int(withdraw_amt * 1e6)).build_transaction({
-                    "from": user_address,
-                    "nonce": nonce,
-                    "gas": 100000,
-                    "gasPrice": w3.eth.gas_price
+                nonce = w3.eth.get_transaction_count(addr)
+                tx = vault.functions.withdraw(int(wd_amt * 1e6)).build_transaction({
+                    "from": addr, "nonce": nonce, "gas": 100000, "gasPrice": w3.eth.gas_price
                 })
-                signed_tx = w3.eth.account.sign_transaction(tx, private_key=user_key)
-                tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
-                st.success(f"Withdraw Transaction Sent: {w3.to_hex(tx_hash)}")
+                signed = w3.eth.account.sign_transaction(tx, key)
+                tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+                st.success(f"Withdrawn! TX: {w3.to_hex(tx_hash)}")
             except Exception as e:
-                st.error(f"Withdraw failed: {e}")
+                st.error(str(e))
 
         # Withdraw to another address
-        st.subheader("Withdraw to Another Wallet")
-        target_addr = st.text_input("Recipient Address")
-        amt_to_send = st.number_input("Amount (USDC)", min_value=0.000001, step=0.01, key="send_amt")
-        if st.button("Send to Address"):
+        st.subheader("Send USDC to Another Wallet")
+        to = st.text_input("Recipient Address")
+        amt2 = st.number_input("Amount", min_value=0.000001, step=0.01, key="send")
+        if st.button("Send USDC"):
             try:
-                nonce = w3.eth.get_transaction_count(user_address)
-                tx = vault_contract.functions.withdrawTo(target_addr, int(amt_to_send * 1e6)).build_transaction({
-                    "from": user_address,
-                    "nonce": nonce,
-                    "gas": 150000,
-                    "gasPrice": w3.eth.gas_price
+                nonce = w3.eth.get_transaction_count(addr)
+                tx = vault.functions.withdrawTo(to, int(amt2 * 1e6)).build_transaction({
+                    "from": addr, "nonce": nonce, "gas": 120000, "gasPrice": w3.eth.gas_price
                 })
-                signed_tx = w3.eth.account.sign_transaction(tx, private_key=user_key)
-                tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
-                st.success(f"Sent: {w3.to_hex(tx_hash)}")
+                signed = w3.eth.account.sign_transaction(tx, key)
+                tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+                st.success(f"Sent! TX: {w3.to_hex(tx_hash)}")
             except Exception as e:
-                st.error(f"Error sending USDC: {e}")
+                st.error("Send error: " + str(e))
 
         if st.button("Logout"):
             st.session_state.clear()
