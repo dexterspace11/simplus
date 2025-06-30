@@ -7,7 +7,7 @@ import os
 from eth_account import Account
 
 # -------- Configuration --------
-INFURA_URL = "https://sepolia.infura.io/v3/YOUR_INFURA_KEY"
+INFURA_URL = "https://sepolia.infura.io/v3/e0fcce634506410b87fc31064eed915a"
 SIMPLUS_CONTRACT_ADDRESS = "0x04239AF5203A7A2b129b5845802Df6EA34d31c9a"
 USDC_CONTRACT_ADDRESS = "0x2Bc7c4Afc076088DB03366a6CA9729ba9E450DaA"
 WALLET_DB_FILE = "wallet_db.json"
